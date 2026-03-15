@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini-Journal — For Fathan</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f3ebe0;
+    --brown-1:#5b3a29; /* dark */
+    --brown-2:#8b5e3c; /* mid */
+    --accent:#d6b89d;  /* light */
+    --glass: rgba(255,255,255,0.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Poppins",sans-serif; background:linear-gradient(180deg,#2a1e16,#1c140f);
+    color:var(--paper); min-height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* subtle moving paper texture */
+  .paper{
+    position:fixed; inset:-10% -10%; background:
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(0,0,0,0.03), transparent 40%);
+    background-size: 80px 80px, 100% 300px; opacity:0.12; transform:rotate(3deg);
+    pointer-events:none;
+  }
+
+  .wrap{ width:94%; max-width:980px; padding:36px; display:flex; flex-direction:column; gap:20px; align-items:center; }
+
+  /* pages */
+  .page{ display:none; width:100%; flex-direction:column; align-items:center; text-align:center; gap:16px; }
+  .page.active{ display:flex; animation:fade .6s ease both; }
+  @keyframes fade{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+
+  .card{ width:100%; background:var(--glass); backdrop-filter:blur(8px); border-radius:16px; padding:18px; box-shadow:0 12px 36px rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.03) }
+
+  h1{ margin:0; color:var(--paper); letter-spacing:.2px }
+  p{ margin:.4rem 0 0; color:rgba(243,235,224,.95); line-height:1.6 }
+
+  .bigBtn{ background:linear-gradient(180deg,#fff,#f3efe9); color:var(--brown-1); border:none; padding:10px 20px; border-radius:28px; cursor:pointer; font-weight:700; box-shadow:0 10px 30px rgba(0,0,0,0.35) }
+
+  /* progress/mini UI */
+  .meta{ display:flex; gap:10px; align-items:center; opacity:.95; font-size:14px }
+
+  /* Gallery carousel (draggable) */
+  .carousel{
+    width:100%; overflow:hidden; position:relative; margin-top:12px; height:220px;
+    border-radius:12px;
+  }
+  .carousel-track{
+    display:flex; gap:12px; transition:transform .45s cubic-bezier(.2,.9,.2,1);
+    will-change:transform;
+    padding:12px;
+  }
+  .card-photo{
+    min-width:200px; height:196px; border-radius:12px; overflow:hidden; background:#111;
+    box-shadow:0 12px 28px rgba(0,0,0,0.5); position:relative; cursor:grab;
+    border:6px solid rgba(255,255,255,0.02);
+  }
+  .card-photo img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .8s ease; }
+
+  .navArrows{ position:absolute; top:50%; transform:translateY(-50%); width:100%; display:flex; justify-content:space-between; pointer-events:none }
+  .navArrows button{ pointer-events:auto; margin:0 6px; background:rgba(255,255,255,0.9); border-radius:50%; width:40px; height:40px; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,0.4) }
+  .navArrows svg{ fill:var(--brown-1); width:18px; height:18px; }
+
+  /* polaroid memory stack */
+  .polaroid-wrap{ display:flex; gap:18px; justify-content:center; align-items:flex-start; margin-top:14px; flex-wrap:wrap }
+  .polaroid{
+    width:170px; background:var(--paper); color:#222; padding:12px 12px 18px; border-radius:8px; box-shadow:0 20px 40px rgba(0,0,0,0.45);
+    transform-origin:center; position:relative; transition:transform .35s;
+  }
+  .polaroid img{ width:100%; height:120px; object-fit:cover; display:block; border-radius:6px; box-shadow:0 6px 12px rgba(0,0,0,0.2) }
+
+  .polaroid:nth-child(1){ transform:rotate(-6deg) translateY(0); }
+  .polaroid:nth-child(2){ transform:rotate(4deg) translateY(8px); margin-top:8px; }
+  .polaroid:nth-child(3){ transform:rotate(-2deg) translateY(4px); }
+
+  /* overlay for fullscreen pics / film */
+  .overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:linear-gradient(rgba(0,0,0,.7), rgba(0,0,0,.85)); z-index:9999; }
+  .overlay.active{ display:flex; }
+  .overlay img{ max-width:92%; max-height:86%; border-radius:12px; box-shadow:0 30px 80px rgba(0,0,0,0.7); transform:scale(.97); transition:transform .45s ease; }
+
+  /* typing message (per paragraph reveal) */
+  .message-area{ max-width:760px; margin:0 auto; text-align:left; font-size:16px; color:rgba(243,235,224,.95); line-height:1.7 }
+  .message-area p{ margin:12px 0; opacity:0; transform:translateY(8px); transition:opacity .6s ease, transform .6s ease }
+
+  /* confetti */
+  .confetti{ position:fixed; width:10px; height:10px; top:-10px; border-radius:3px; opacity:0.95; z-index:9998 }
+
+  /* level up */
+  .levelCard{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:18px; border-radius:14px; background:linear-gradient(180deg,#e8d7c9,#efe6db); color:var(--brown-1); box-shadow:0 18px 44px rgba(0,0,0,0.45) }
+  .levelBadge{ padding:12px 24px; border-radius:999px; background:var(--brown-2); color:var(--paper); font-weight:800; font-size:20px; transform:scale(.9); transition:transform .6s cubic-bezier(.2,.9,.2,1) }
+
+  /* responsive */
+  @media (max-width:880px){
+    .carousel{ height:180px }
+    .card-photo{ min-width:160px; height:160px; }
+    .polaroid{ width:140px } 
+  }
+  @media (max-width:520px){
+    .galleryTitle{ font-size:18px }
+    .card{ padding:14px }
+  }
+
+  /* tiny helper */
+  .muted{ opacity:.8; font-size:13px }
+</style>
+</head>
+<body>
+
+<div class="paper"></div>
+
+<div class="wrap">
+
+  <!-- PAGE 1: opening -->
+  <div class="page active" id="page1">
+    <div class="card">
+      <h1 id="introTyping">...</h1>
+      <p class="muted">Klik tombol untuk memulai film kecil ini. Musik akan mulai lembut.</p>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center">
+        <button class="bigBtn" id="startBtn">Play Mini Film</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 2: reveal -->
+  <div class="page" id="page2">
+    <div class="card">
+      <h1>🎉 Happy Birthday, Fathan 🎉</h1>
+      <p>hari ini tentangmu — level baru, mimpi baru.</p>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:8px">
+      <button class="bigBtn" onclick="nextPage(3)">Lihat Profil</button>
+      <button class="bigBtn" onclick="playConfetti()">Blow Candle</button>
+    </div>
+  </div>
+
+  <!-- PAGE 3: profile with carousel (swipe) -->
+  <div class="page" id="page3">
+    <div class="card">
+      <h1 class="galleryTitle">This is You — Fathan</h1>
+      <p class="muted">Level 14 • Favorite: Nasi Padang • Luffy stan</p>
+
+      <div class="carousel" id="carousel">
+        <div class="carousel-track" id="track">
+          <!-- photos injected by JS -->
+        </div>
+        <div class="navArrows">
+          <button id="prevBtn" aria-label="prev">&lt;</button>
+          <button id="nextBtn" aria-label="next">&gt;</button>
+        </div>
+      </div>
+
+    </div>
+    <div style="display:flex; gap:12px; margin-top:10px">
+      <button class="bigBtn" onclick="nextPage(4)">Memories (mini film)</button>
+      <button class="bigBtn" onclick="nextPage(5)">Message</button>
+    </div>
+  </div>
+
+  <!-- PAGE 4: polaroid mini-film -->
+  <div class="page" id="page4">
+    <h1>Our Polaroids</h1>
+    <div class="card">
+      <div class="polaroid-wrap" id="polaroidWrap"></div>
+      <p class="muted" style="margin-top:10px">Tekan "Play Film" untuk slideshow kenangan (otomatis ken-burns).</p>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center">
+        <button class="bigBtn" onclick="startMiniFilm()">Play Film</button>
+        <button class="bigBtn" onclick="nextPage(5)">Skip to Message</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 5: message (per-paragraph reveal) -->
+  <div class="page" id="page5">
+    <div class="card">
+      <h1>A Message For You</h1>
+      <div class="message-area" id="messageArea">
+        <!-- paste your long message paragraphs here as <p>...</p> -->
+        <p>Dear Fathan,</p>
+        <p>[Masukkan paragraf 1 — kenangan singkat atau harapan.]</p>
+        <p>[Masukkan paragraf 2 — cerita lucu atau serius.]</p>
+        <p>[Masukkan paragraf 3 — penutup dan doa.]</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px">
+      <button class="bigBtn" onclick="revealAllMessage()">Reveal Message</button>
+      <button class="bigBtn" onclick="nextPage(6)">Last Page</button>
+    </div>
+  </div>
+
+  <!-- PAGE 6: final -->
+  <div class="page" id="page6">
+    <div class="levelCard">
+      <div class="levelBadge" id="levelBadge">🎮 Level 14</div>
+      <p class="muted">Fathan — unlocked</p>
+      <div style="margin-top:8px; display:flex; gap:10px">
+        <button class="bigBtn" onclick="nextPage(3)">Replay</button>
+        <button class="bigBtn" onclick="downloadCard()">Save as Image</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- overlay for fullscreen -->
+<div class="overlay" id="overlay" onclick="closeOverlay(event)">
+  <img id="overlayImg" src="" alt="photo">
+</div>
+
+<!-- confetti container (dynamic) -->
+<div id="confettiRoot"></div>
+
+<!-- floating hearts -->
+<div id="heartsRoot" style="pointer-events:none"></div>
+
+<!-- hidden youtube iframe (autoplay loop) -->
+<iframe id="ytPlayer" src="" allow="autoplay" style="position:absolute;width:0;height:0;border:0"></iframe>
+
+<script>
+/* =================== CONFIG ======================
+ Replace the URLs below with your uploaded image URLs.
+ - fathanPhotos: 10 photos of Fathan
+ - memoryPhotos: 3 photos of you & him (polaroid)
+ - youtubeId: YouTube video ID (Memori Baik default)
+================================================== */
+
+/* placeholder images (picsum) — replace these */
+const fathanPhotos = [
+  'https://picsum.photos/id/1011/1200/800',
+  'https://picsum.photos/id/1025/1200/800',
+  'https://picsum.photos/id/1005/1200/800',
+  'https://picsum.photos/id/1015/1200/800',
+  'https://picsum.photos/id/1027/1200/800',
+  'https://picsum.photos/id/1035/1200/800',
+  'https://picsum.photos/id/1041/1200/800',
+  'https://picsum.photos/id/1050/1200/800',
+  'https://picsum.photos/id/1062/1200/800',
+  'https://picsum.photos/id/1069/1200/800'
+];
+
+const memoryPhotos = [
+  'https://picsum.photos/id/1074/1200/800',
+  'https://picsum.photos/id/1084/1200/800',
+  'https://picsum.photos/id/109/1200/800'
+];
+
+// default YouTube id you gave earlier; replace if needed
+const youtubeId = 'I-BXQ3BD4cE';
+
+/* ================================================= */
+
+const track = document.getElementById('track');
+const overlay = document.getElementById('overlay');
+const overlayImg = document.getElementById('overlayImg');
+const polaroidWrap = document.getElementById('polaroidWrap');
+const yt = document.getElementById('ytPlayer');
+const confettiRoot = document.getElementById('confettiRoot');
+const heartsRoot = document.getElementById('heartsRoot');
+
+/* ---------- intro typing ---------- */
+const introText = "Hey Fathan… someone made this little film-journal for you.";
+let idx = 0;
+function introType(){
+  if(idx < introText.length){
+    document.getElementById('introTyping').innerText += introText.charAt(idx);
+    idx++; setTimeout(introType, 36);
+  }
+}
+introType();
+
+/* ---------- build carousel photos ---------- */
+function initCarousel(){
+  track.innerHTML = '';
+  fathanPhotos.forEach((src, i) => {
+    const div = document.createElement('div');
+    div.className = 'card-photo';
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = 'fathan' + (i+1);
+    img.loading = 'lazy';
+    img.onclick = ()=> openOverlay(src);
+    img.onerror = ()=> { img.style.filter = 'grayscale(40%)'; img.style.opacity=.6; };
+    div.appendChild(img);
+    track.appendChild(div);
+  });
+  // set initial visible area
+  currentIndex = 0;
+  updateTrack();
+}
+let currentIndex = 0;
+function updateTrack(){
+  const cardWidth = track.querySelector('.card-photo') ? track.querySelector('.card-photo').offsetWidth + 12 : 212;
+  const visibleWidth = document.querySelector('.carousel').offsetWidth;
+  // center currentIndex
+  const centerOffset = Math.max(0, currentIndex * cardWidth - (visibleWidth - cardWidth) / 2);
+  track.style.transform = `translateX(-${centerOffset}px)`;
+}
+
+/* drag / swipe support */
+let isDown=false, startX=0, scrollLeft=0;
+track.addEventListener('pointerdown', (e)=>{
+  isDown=true; track.style.cursor='grabbing';
+  startX = e.clientX;
+  trackStart = parseFloat(track.style.transform.replace('translateX(','').replace('px)','')) || 0;
+  e.target.setPointerCapture(e.pointerId);
+});
+track.addEventListener('pointerup', (e)=>{ isDown=false; track.style.cursor='grab'; });
+track.addEventListener('pointerleave', ()=>{ isDown=false; track.style.cursor='grab'; });
+track.addEventListener('pointermove', (e)=>{
+  if(!isDown) return;
+  e.preventDefault();
+  const dx = e.clientX - startX;
+  track.style.transform = `translateX(${trackStart + dx}px)`;
+});
+
+/* arrows */
+document.getElementById('prevBtn').addEventListener('click', ()=>{
+  currentIndex = Math.max(0, currentIndex - 1); updateTrack();
+});
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  currentIndex = Math.min(Math.max(0, fathanPhotos.length - 1), currentIndex + 1); updateTrack();
+});
+
+/* resize */
+window.addEventListener('resize', ()=> setTimeout(updateTrack,120));
+
+/* ---------- polaroid stack ---------- */
+function initPolaroids(){
+  polaroidWrap.innerHTML = '';
+  memoryPhotos.forEach((src, i) => {
+    const d = document.createElement('div');
+    d.className = 'polaroid';
+    const img = document.createElement('img');
+    img.src = src; img.alt = 'mem'+(i+1); img.loading='lazy';
+    img.onerror = ()=> img.style.opacity=.6;
+    d.appendChild(img);
+    d.onclick = ()=> openOverlay(src);
+    polaroidWrap.appendChild(d);
+  });
+}
+
+/* ---------- overlay controls ---------- */
+function openOverlay(src){
+  overlay.classList.add('active'); overlayImg.src = src; setTimeout(()=> overlayImg.style.transform = 'scale(1)', 30);
+}
+function closeOverlay(e){
+  if(e && e.target !== overlay) return;
+  overlay.classList.remove('active'); overlayImg.src = ''; overlayImg.style.transform = 'scale(.97)';
+}
+
+/* ---------- mini-film slideshow (memoryPhotos) ---------- */
+let miniFilmInterval = null;
+function startMiniFilm(){
+  if(!memoryPhotos || memoryPhotos.length === 0) return nextPage(5);
+  let i=0;
+  openOverlay(memoryPhotos[i]);
+  overlayImg.style.transition = 'transform 6s ease';
+  overlayImg.style.transform = 'scale(1.05)';
+  miniFilmInterval = setInterval(()=>{
+    i++;
+    if(i >= memoryPhotos.length){
+      clearInterval(miniFilmInterval);
+      setTimeout(()=>{ closeOverlay({target:overlay}); nextPage(5); }, 900);
+      return;
+    }
+    overlayImg.classList.remove('show');
+    setTimeout(()=>{ overlayImg.src = memoryPhotos[i]; overlayImg.classList.add('show'); overlayImg.style.transform='scale(1.02)'; setTimeout(()=> overlayImg.style.transform='scale(1.05)', 50); }, 350);
+  }, 3800);
+  overlay.onclick = ()=> { clearInterval(miniFilmInterval); closeOverlay({target:overlay}); overlay.onclick = null; };
+}
+
+/* ---------- confetti & hearts ---------- */
+function playConfetti(){
+  for(let i=0;i<80;i++){
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = (Math.random()*100)+'vw';
+    c.style.background = `hsl(${Math.random()*50+10},60%,60%)`;
+    c.style.animationDuration = (2 + Math.random()*2.5) + 's';
+    confettiRoot.appendChild(c);
+    setTimeout(()=> c.remove(), 3000);
+  }
+  // hearts
+  for(let i=0;i<6;i++){
+    const h = document.createElement('div');
+    h.className = 'heart';
+    h.style.left = (20 + Math.random()*220) + 'px';
+    heartsRoot.appendChild(h);
+    setTimeout(()=> h.remove(), 4200 + Math.random()*1200);
+  }
+}
+
+/* ---------- pages navigation ---------- */
+function nextPage(n){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el = document.getElementById('page'+n);
+  if(el) el.classList.add('active');
+  // triggers
+  if(n===3) { initCarousel(); updateTrack(); }
+  if(n===4) { initPolaroids(); }
+  if(n===6) { levelUp(); }
+}
+
+/* ---------- message reveal (per paragraph) ---------- */
+function revealAllMessage(){
+  const ps = document.querySelectorAll('#messageArea p');
+  ps.forEach((p,i)=> setTimeout(()=> { p.style.opacity=1; p.style.transform='translateY(0)'; }, i*500));
+}
+
+/* ---------- level up animation ---------- */
+function levelUp(){
+  const badge = document.getElementById('levelBadge');
+  setTimeout(()=> badge.style.transform='scale(1.18)', 100);
+  setTimeout(()=> badge.style.transform='scale(1)', 700);
+  setTimeout(()=> playConfetti(), 900);
+}
+
+/* ---------- youtube background audio ---------- */
+function startYTAudio(){
+  if(!youtubeId) return;
+  yt.src = `https://www.youtube.com/embed/${youtubeId}?autoplay=1&loop=1&playlist=${youtubeId}&controls=0&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1`;
+}
+
+/* ---------- start button ---------- */
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  startYTAudio();
+  nextPage(2);
+  // gently reveal intro -> page2
+  setTimeout(()=> nextPage(3), 1600);
+});
+
+/* ---------- save as image note ---------- */
+function downloadCard(){
+  alert('Untuk menyimpan: screenshot halaman akhir. Kalau mau fitur otomatis (PNG), aku tambahin html2canvas script — bilang aja, aku langsung tambahin.');
+}
+
+/* ---------- init defaults ---------- */
+function initCarousel(){ initGallery(); }
+function initGallery(){
+  // build track
+  track.innerHTML = '';
+  fathanPhotos.forEach((src, i)=>{
+    const d = document.createElement('div'); d.className='card-photo';
+    const img = document.createElement('img'); img.src = src; img.alt = 'f'+(i+1);
+    img.loading='lazy'; img.onerror = ()=> { img.style.filter='grayscale(40%)'; img.style.opacity=.6; };
+    img.onclick = ()=> openOverlay(src);
+    d.appendChild(img); track.appendChild(d);
+  });
+  currentIndex = 0; updateTrack();
+}
+
+/* small helpers */
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape') closeOverlay({target:overlay});
+});
+
+/* start building simple defaults so nothing is empty */
+initCarousel();
+initPolaroids();
+
+</script>
+</body>
+</html>
